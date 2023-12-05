@@ -17,11 +17,11 @@ class Schematic
         @data = File.open("../input.txt").readlines.map(&:chomp)
     end
 
-    def get_part_numbers
+    def part_numbers
         part_numbers = []
         0.upto(@data.length - 1).each do |row|
             pcol = 0
-            numbers_with_index = @data[row].scan(/(\d+)/).each do |captures|
+            @data[row].scan(/(\d+)/).each do |captures|
                 captures.each do |capture|
                     col = @data[row][pcol..-1].index(capture) + pcol
                     part_numbers << PartNumber.new(capture.to_i, row + 1, col) if check_is_part_number?(capture, row, col)
@@ -60,7 +60,7 @@ end
 
 schematic = Schematic.new
 
-result = schematic.get_part_numbers.inject(0) do |sum, part_number|
+result = schematic.part_numbers.inject(0) do |sum, part_number|
     puts part_number
     sum += part_number.number
 end
