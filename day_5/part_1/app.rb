@@ -6,22 +6,23 @@ class DestinationCategory
     end
 
     def source_range
-        @source_range ||= (@source_range_start..(@source_range_start + @range_length - 1)).to_a
+        @source_range = [@source_range_start, @source_range_start + @range_length - 1]
     end
 
     def destination_range
-        @destination_range ||= (@destination_range_start..(@destination_range_start + @range_length - 1)).to_a
+        @destination_range = [@destination_range_start, @destination_range_start + @range_length - 1]
     end
 
     def destination_value_for(source_value)
-        return source_value unless source_range.include?(source_value)
-        destination_range[source_range.index(source_value)]
+        return destination_range[0] + (source_value - source_range[0]) if source_value >= source_range[0] && source_value <= source_range[1]
+
+        source_value
     end
 end
 
 class Almanac
     def initialize
-        @data = File.read('../test.txt')
+        @data = File.read('../input.txt')
     end
 
     def seeds
@@ -29,59 +30,37 @@ class Almanac
     end
 
     def get_locations_for(seed)
-        p ["seed", seed]
-        soils = seed_to_soil_map
-            .map { |map| map.destination_value_for(seed) }
-            .uniq
-        p ["soils", soils]
+        soils = get_mappings_for(seed, seed_to_soil_map)
         return soils if soils.empty?
 
         fertilizers = soils.map do |soil|
-            seed_to_fertilizer_map
-                .map { |map| map.destination_value_for(soil) }
-                .uniq
+            get_mappings_for(soil, seed_to_fertilizer_map)
         end.flatten
-        p ["fertilizers", fertilizers]
         return fertilizers if fertilizers.empty?
 
         waters = fertilizers.map do |fertilizer|
-            fertilizer_to_water_map
-                .map { |map| map.destination_value_for(fertilizer) }
-                .uniq
+            get_mappings_for(fertilizer, fertilizer_to_water_map)
         end.flatten
-        p ["waters", waters]
         return waters if waters.empty?
 
         lights = waters.map do |water|
-            water_to_light_map
-                .map { |map| map.destination_value_for(water) }
-                .uniq
+            get_mappings_for(water, water_to_light_map)
         end.flatten
-        p ["lights", lights]
         return lights if lights.empty?
 
         temperatures = lights.map do |light|
-            light_to_temperature_map
-                .map { |map| map.destination_value_for(light) }
-                .uniq
+            get_mappings_for(light, light_to_temperature_map)
         end.flatten
-        p ["temperatures", temperatures]
         return temperatures if temperatures.empty?
 
         humidities = temperatures.map do |temperature|
-            temperature_to_humidity_map
-                .map { |map| map.destination_value_for(temperature) }
-                .uniq
+            get_mappings_for(temperature, temperature_to_humidity_map)
         end.flatten
-        p ["humidities", humidities]
         return humidities if humidities.empty?
 
         locations = humidities.map do |humidity|
-            humidity_to_location_map
-                .map { |map| map.destination_value_for(humidity) }
-                .uniq
+            get_mappings_for(humidity, humidity_to_location_map)
         end.flatten
-        p ["locations", locations]
         return locations if locations.empty?
 
         locations
@@ -147,22 +126,28 @@ class Almanac
             .map { |row| row.split(' ').map(&:to_i) }
             .map { |row| DestinationCategory.new(*row) }
     end
+
+    def get_mappings_for(seed, mapping)
+        results = mapping
+            .map { |map| map.destination_value_for(seed) }
+            .uniq
+
+        # If the results contain anything other than the seed value, then we need to remove the seed value
+        # from the results.
+        if results.length > 1 && results.include?(seed)
+            results.delete(seed)
+        end
+
+        results
+    end
 end
 
 almanac = Almanac.new
 
-# p almanac.seeds
-# p almanac.seed_to_soil_map
-# p almanac.seed_to_fertilizer_map
-# p almanac.fertilizer_to_water_map
-# p almanac.water_to_light_map
-# p almanac.light_to_temperature_map
-# p almanac.temperature_to_humidity_map
-# p almanac.humidity_to_location_map
-# puts ""
-
 lowest_location = nil
 almanac.seeds.each do |seed|
-    p [seed, almanac.get_locations_for(seed)]
+    locations = almanac.get_locations_for(seed)
+    lowest_location = locations.min if lowest_location.nil? || locations.min < lowest_location
 end
 
+puts lowest_location
