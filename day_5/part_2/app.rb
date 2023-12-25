@@ -5,28 +5,12 @@ class DestinationCategory
         @range_length = args[2]
     end
 
-    def source_range
-        @source_range = [@source_range_start, @source_range_start + @range_length - 1]
-    end
-
-    def destination_range
-        @destination_range = [@destination_range_start, @destination_range_start + @range_length - 1]
-    end
-
-    def destination_value_for(source_value)
-        return destination_range[0] + (source_value - source_range[0]) if source_value >= source_range[0] && source_value <= source_range[1]
-
-        source_value
-    end
+    attr_reader :destination_range_start, :source_range_start, :range_length
 end
 
 class Almanac
     def initialize
         @data = File.read('../test.txt')
-    end
-
-    def seeds
-        @data.split("\n")[0].split(' ').map(&:to_i).select { |n| n > 0 }
     end
 
     def seed_ranges
@@ -36,31 +20,35 @@ class Almanac
             .map(&:to_i)
             .select { |n| n > 0 }
             .each_slice(2)
-            .map { |start, length| [start, start + length - 1] }
-            .sort { |a, b| b[0] <=> a[0] }
+            .map { |start, length| Hash.new.tap { |h| h[:start] = start; h[:length] = length } }
     end
 
     def walk(value, range, name = nil)
-        if name.nil?
-            return walk(value, range, create_maps.keys.first)
-        end
-        
+        # Get the map we need to use
         item = create_maps[name]
 
+        # If we don't have a map for this name, we've reached the end
         if item.nil?
-            puts "Found #{value} in #{name}"
-            return
+            puts "End of the line: #{value} (#{range}) [#{name}]"
+            return [value, range]
         end
 
-        range_item = item[:map].find { |i| i.source_range[0] <= value && i.source_range[1] >= value }
+        # Find the range item where we intersect
+        range_item = item[:map].find { |i| i.source_range_start <= value && i.source_range_start + i.range_length >= value }
 
+        # If we don't have a range for this, then we need to return the value itself
         if range_item.nil?
-            puts "Could not find #{value} in #{name}"
             return walk(value, 1, item[:to])
         end
 
-        puts "Found #{value} in #{name} (#{range_item.source_range} -> #{range_item.destination_range})"
-        walk(range_item.destination_value_for(value), range, item[:to])
+        diff = value - range_item.source_range_start
+        new_value = range_item.destination_range_start + diff
+        new_range = range_item.range_length - diff
+
+        puts "#{name}: #{value} -> #{new_value} (#{range_item.destination_range_start} + #{diff})"
+        puts "  #{range} -> #{new_range} (#{range_item.range_length} - #{diff})"
+        sleep 1
+        walk(new_value, [range, new_range].min, item[:to])
     end
 
     private
@@ -86,10 +74,20 @@ end
 
 almanac = Almanac.new
 
-# almanac.seed_ranges.each do |range|
-#     almanac.walk(range[0], range)
-# end
+lowest_location = nil
+almanac.seed_ranges.each do |range|
+    remaining = range[:length]
+    start = range[:start]
 
-almanac.seeds.each do |seed|
-    almanac.walk(seed, 1)
+    while remaining > 0
+        location, consumed = almanac.walk(start, remaining, 'soil')
+        lowest_location = location if lowest_location.nil? || location < lowest_location
+
+        start += consumed
+        remaining -= consumed
+
+        puts "location: #{location}, consumed: #{consumed}, remaining: #{remaining}" if consumed > 1
+    end
 end
+
+puts lowest_location
