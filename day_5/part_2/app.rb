@@ -10,7 +10,7 @@ end
 
 class Almanac
     def initialize
-        @data = File.read('../test.txt')
+        @data = File.read('../input.txt')
     end
 
     def seed_ranges
@@ -33,7 +33,7 @@ class Almanac
 
         # If we don't have a map for this name, we've reached the end
         if item.nil?
-            puts "End of the line: #{value} (#{range}) [#{name}]"
+            # puts "End of the line: #{value} (#{range}) [#{name}]"
             return [value, range]
         end
 
@@ -80,20 +80,34 @@ end
 
 almanac = Almanac.new
 
-lowest_location = nil
+threads = []
+locations = {}
 almanac.seed_ranges.each do |range|
-    remaining = range[:length]
-    start = range[:start]
+    locations[range] = nil
 
-    while remaining > 0
-        location, consumed = almanac.walk(start, remaining)
-        lowest_location = location if lowest_location.nil? || location < lowest_location
+    threads << Thread.new do
+        puts "Processing #{range}"
+        remaining = range[:length]
+        start = range[:start]
+        lowest_location = nil
 
-        start += consumed
-        remaining -= consumed
+        while remaining > 0
+            location, consumed = almanac.walk(start, remaining)
+            lowest_location = location if lowest_location.nil? || location < lowest_location
 
-        puts "location: #{location}, consumed: #{consumed}, remaining: #{remaining}" if consumed > 1
+            start += consumed
+            remaining -= consumed
+
+            puts "[#{range}]location: #{location}, consumed: #{consumed}, remaining: #{remaining}" if consumed > 1
+        end
+
+        puts "Finished #{range}"
+
+        locations[range] = lowest_location
     end
 end
+threads.each(&:join)
 
-puts lowest_location
+p locations
+puts "\n"
+puts locations.values.min
